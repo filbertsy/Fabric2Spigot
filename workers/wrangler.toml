@@ -1,5 +1,3 @@
-
 name = "fabric2spigot-api"
 main = "index.js"
 compatibility_date = "2026-11-04"
-workers_dev = true

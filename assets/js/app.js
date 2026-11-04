@@ -1,3 +1,5 @@
+console.log("[Fabric2Spigot] app.js loaded");
+alert("Fabric2Spigot app.js loaded");
 
 const API_URL = "https://fabric2spigot-api.freehook.workers.dev";
 

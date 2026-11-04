@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fabric2Spigot</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <header>
+        <h2>Fabric<span>2</span>Spigot</h2>
+        <nav>
+            <a href="#converter">Converter</a>
+            <a href="#about">About</a>
+            <a href="https://github.com/">GitHub</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <p class="tag">FABRIC → SPIGOT</p>
+            <h1>Mods into plugins.</h1>
+            <p>Convert Minecraft Fabric mods into Paper and Spigot plugins.</p>
+        </section>
+
+        <section id="converter" class="converter">
+            <h2>Upload your Fabric mod</h2>
+            <p>Choose a Fabric mod JAR to analyze.</p>
+
+            <input type="file" id="modFile" accept=".jar">
+
+            <button id="analyzeButton">Analyze mod</button>
+
+            <pre id="output">Waiting for a mod...</pre>
+        </section>
+
+        <section id="about">
+            <h2>About Fabric2Spigot</h2>
+            <p>A community project exploring automated Fabric-to-Paper porting.</p>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="assets/js/analyzer.js"></script>
+    <script src="assets/js/app.js"></script>
+</body>
+</html>

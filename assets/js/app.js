@@ -1,3 +1,4 @@
+const API_URL = "https://fabric2spigot-api.freehook.workers.dev";
 
 const fileInput = document.getElementById("modFile");
 const analyzeButton = document.getElementById("analyzeButton");

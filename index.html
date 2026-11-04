@@ -1,278 +1,257 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#171719">
-    <meta name="description" content="Fabric2Spigot — Analyze Fabric mods and explore conversion to Paper and Spigot plugins.">
-    <title>Fabric2Spigot — Mod Conversion Engine</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151516">
+  <meta name="description" content="fabric2spigot — analyze Fabric mods and explore conversion to Paper and Spigot plugins.">
+  <title>fabric2spigot — mod conversion</title>
+  <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+  <div class="scene" aria-hidden="true">
+    <div class="scene-glow"></div>
+    <div class="scene-grid"></div>
+    <div class="scene-particles"></div>
+    <div class="scene-vignette"></div>
+  </div>
 
-    <div class="background-effects">
-        <div class="red-glow glow-one"></div>
-        <div class="red-glow glow-two"></div>
-        <div class="grid-overlay"></div>
-    </div>
+  <header class="navbar">
+    <a class="brand" href="#">
+      <span class="brand-mark">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M12 10 23 4 31 12 24 22 15 20Z" fill="#e9dfc8"/>
+          <path d="M8 20 17 17 25 25 18 34 7 29Z" fill="#bcb29e"/>
+          <path d="M19 34 28 26 37 35 29 45 17 43Z" fill="#e5d8bd"/>
+          <path d="M34 7 41 3 47 11 40 19 32 15Z" fill="#d0c6b3"/>
+          <path d="M40 15 46 9 53 16 48 25 39 23Z" fill="#f0e5ce"/>
+          <path d="M39 31 46 22 54 28 49 39 39 39Z" fill="#c9bda6"/>
+          <path d="M24 44 33 39 40 47 33 57 23 54Z" fill="#d9cdb5"/>
+          <path d="M44 34 51 31 58 38 51 47 43 44Z" fill="#a9a092"/>
+          <path d="M26 22 32 17 39 24 33 33 25 30Z" fill="#f4ead5"/>
+          <path d="M37 25 43 20 48 27 42 35 35 33Z" fill="#d8ccb4"/>
+          <path d="M17 30 24 26 31 34 24 41 15 38Z" fill="#cfc3aa"/>
+          <path d="M30 35 38 30 45 38 38 47 29 44Z" fill="#e9ddc4"/>
+          <path d="M39 5 48 8 57 9 56 16 46 15 39 12Z" fill="#77777a"/>
+          <path d="M47 12 54 14 51 26 45 25Z" fill="#66666a"/>
+          <path d="M45 24 55 25 57 33 47 34 41 30Z" fill="#88888b"/>
+          <path d="M48 32 58 33 61 40 54 44 45 40Z" fill="#555559"/>
+        </svg>
+      </span>
+      <span class="brand-name">fabric<span>2</span>spigot</span>
+      <span class="beta">beta</span>
+    </a>
 
-    <header class="navbar">
-        <a href="#" class="brand">
-            <span class="brand-icon">F</span>
-            FABRIC<span class="brand-red">2</span>SPIGOT
-            <span class="version">BETA</span>
-        </a>
+    <nav class="nav-links">
+      <a class="active" href="#converter">converter</a>
+      <a href="#features">features</a>
+      <a href="#about">about</a>
+      <a href="https://github.com/" target="_blank" rel="noopener">github ↗</a>
+    </nav>
 
-        <nav>
-            <a href="#converter">Converter</a>
-            <a href="#features">Features</a>
-            <a href="#about">About</a>
-            <a href="https://github.com/" target="_blank" rel="noopener">GitHub ↗</a>
-        </nav>
+    <div class="online-status"><i></i> system online</div>
+    <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation">☰</button>
+  </header>
 
-        <div class="system-status">
-            <span class="status-dot"></span>
-            SYSTEM ONLINE
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span>//</span> mod conversion environment</div>
+        <h1>mods into<br><span>plugins.</span></h1>
+        <p>
+          convert minecraft fabric mods into paper and spigot plugins.
+          analyze first, translate what is supported, and see what needs work.
+        </p>
+        <div class="hero-buttons">
+          <a class="button button-primary" href="#converter">start converting <b>→</b></a>
+          <a class="button button-ghost" href="#features">learn more <b>↗</b></a>
         </div>
-    </header>
+        <div class="hero-meta">
+          <span><i></i> fabric input</span>
+          <span><i></i> paper / spigot target</span>
+          <span><i></i> compatibility analysis</span>
+        </div>
+      </div>
 
-    <main>
+      <div class="hero-art" aria-label="fabric2spigot conversion emblem">
+        <div class="art-ring ring-a"></div>
+        <div class="art-ring ring-b"></div>
+        <div class="art-glow"></div>
+        <div class="art-logo">
+          <svg viewBox="0 0 300 230" role="img" aria-label="pixelated block and hammer emblem">
+            <g class="pixel-block">
+              <path d="M63 39 91 12 124 29 143 4 177 25 195 7 222 36 204 65 233 87 211 119 229 148 199 174 178 205 145 188 119 217 91 192 61 202 47 169 18 151 38 120 13 92 39 68Z" fill="#302d27" stroke="#181818" stroke-width="8"/>
+              <path d="M67 48 94 25 119 42 140 17 173 39 193 21 211 45 192 72 218 91 198 120 214 146 187 166 170 191 143 175 119 199 94 177 67 184 56 157 32 143 49 117 27 94 51 73Z" fill="#d7cbb1"/>
+              <path d="M88 27 117 43 103 69 75 55Z M140 18 171 39 155 66 123 49Z M194 22 211 46 193 72 174 51Z" fill="#eee3cc"/>
+              <path d="M50 73 76 55 103 69 88 96 60 104 39 92Z M123 49 155 66 143 94 112 82Z M174 51 193 72 177 101 151 89Z" fill="#bdb39e"/>
+              <path d="M60 104 88 96 112 82 103 115 75 135 49 117Z M143 94 177 101 165 130 135 122Z M198 120 218 91 229 111 211 139Z" fill="#e9dec8"/>
+              <path d="M75 135 103 115 135 122 119 151 91 177 67 158Z M165 130 198 120 214 146 187 166 170 191 143 175Z" fill="#c7bca5"/>
+              <path d="M119 151 135 122 165 130 170 160 143 175Z" fill="#eee3cc"/>
+            </g>
+            <g class="hammer">
+              <path d="M190 30 208 14 275 36 269 61 204 48Z" fill="#858589" stroke="#242427" stroke-width="7" stroke-linejoin="round"/>
+              <path d="M222 46 247 53 223 137 199 131Z" fill="#68686c" stroke="#242427" stroke-width="7"/>
+              <path d="M189 125 239 133 254 156 236 180 179 171 163 150Z" fill="#77777b" stroke="#242427" stroke-width="7"/>
+              <path d="M178 144 232 153 221 173 174 164Z" fill="#929296" opacity=".6"/>
+            </g>
+          </svg>
+        </div>
+        <div class="art-caption"><span>f2s</span> conversion core</div>
+        <div class="art-chip chip-one">fabric input</div>
+        <div class="art-chip chip-two">plugin output</div>
+      </div>
+    </section>
 
-        <section class="hero">
-            <div class="hero-content">
-                <div class="eyebrow">
-                    <span class="eyebrow-line"></span>
-                    MINECRAFT MOD CONVERSION ENVIRONMENT
-                </div>
+    <section id="converter" class="converter-section">
+      <div class="converter-intro">
+        <div class="section-label"><span>/01</span> conversion module</div>
+        <h2>upload your <span>mod.</span></h2>
+        <p>choose a fabric mod jar to begin compatibility analysis.</p>
+        <div class="small-red-line"></div>
+      </div>
 
-                <h1>
-                    MODS REBUILT.<br>
-                    <span>LIMITS REMOVED.</span>
-                </h1>
+      <div class="converter-panel">
+        <div class="drop-zone" id="dropZone">
+          <div class="upload-symbol">
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+              <path d="M16 21V5m0 0-6 6m6-6 6 6M5 20v6h22v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h3>drop your fabric jar here</h3>
+          <p>or click to browse</p>
+          <span>.jar file · local analysis</span>
+          <input type="file" id="modFile" accept=".jar">
+          <label for="modFile" class="drop-click-target" aria-label="Choose a Fabric JAR"></label>
+          <div id="selectedFile" class="selected-file"></div>
+        </div>
+      </div>
 
-                <p class="hero-description">
-                    A new approach to Minecraft mod compatibility.
-                    Analyze Fabric modifications and translate supported
-                    functionality into Paper and Spigot plugins.
-                </p>
+      <button id="analyzeButton" class="analyze-button">
+        analyze mod <span>→</span>
+      </button>
+    </section>
 
-                <div class="hero-actions">
-                    <a href="#converter" class="primary-button">
-                        Start converting <span>→</span>
-                    </a>
-                    <a href="#features" class="secondary-button">
-                        Explore engine
-                    </a>
-                </div>
+    <section class="console-section">
+      <div class="console-title">
+        <div class="section-label"><span>/02</span> analysis output</div>
+        <h2>engine <span>console.</span></h2>
+        <p>detailed logs and analysis results appear here.</p>
+      </div>
+      <div class="console-window">
+        <div class="console-top">
+          <div class="window-dots"><i></i><i></i><i></i></div>
+          <span>fabric2spigot / terminal</span>
+          <div class="console-live"><i></i> live</div>
+        </div>
+        <pre id="output">› waiting for a fabric mod...
+› system initialized.
+› ready for input.</pre>
+      </div>
+    </section>
 
-                <div class="hero-meta">
-                    <span><i></i> FABRIC SUPPORT</span>
-                    <span><i></i> PAPER / SPIGOT TARGET</span>
-                    <span><i></i> ANALYSIS ENGINE</span>
-                </div>
-            </div>
+    <section id="features" class="features-section">
+      <div class="features-heading">
+        <div class="section-label"><span>/03</span> engine capabilities</div>
+        <h2>built for <span>compatibility.</span></h2>
+        <p>powerful tools to analyze, translate and generate.</p>
+      </div>
 
-            <div class="hero-visual">
-                <div class="visual-orbit orbit-one"></div>
-                <div class="visual-orbit orbit-two"></div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-number">01</span>
+          <div class="feature-icon">⌕</div>
+          <h3>deep analysis</h3>
+          <p>inspect mod metadata, dependencies, entrypoints and internal structure.</p>
+          <span class="feature-type">inspection</span>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">02</span>
+          <div class="feature-icon">⇄</div>
+          <h3>api translation</h3>
+          <p>map supported Fabric functionality to Bukkit and Paper APIs.</p>
+          <span class="feature-type">translation</span>
+        </article>
+        <article class="feature-card">
+          <span class="feature-number">03</span>
+          <div class="feature-icon">⬡</div>
+          <h3>plugin generation</h3>
+          <p>generate plugin source and configuration for supported conversions.</p>
+          <span class="feature-type">generation</span>
+        </article>
+      </div>
+    </section>
 
-                <div class="visual-core">
-                    <div class="core-inner">
-                        <span class="core-symbol">F<span>2</span>S</span>
-                        <span class="core-label">CONVERSION ENGINE</span>
-                        <div class="core-line"></div>
-                        <span class="core-subtitle">INITIALIZED</span>
-                    </div>
-                </div>
+    <section id="about" class="about-section">
+      <div>
+        <div class="section-label"><span>/04</span> about the project</div>
+        <h2>one ecosystem.<br><span>different platforms.</span></h2>
+      </div>
+      <p>
+        fabric2spigot is a community project exploring automated conversion
+        of minecraft fabric mods into paper and spigot plugins. not every mod
+        can be converted automatically, so unsupported features will be
+        reported instead of being presented as successfully converted.
+      </p>
+      <a href="#converter" class="about-link">try the analyzer →</a>
+    </section>
+  </main>
 
-                <div class="floating-label label-top">
-                    <span class="mini-dot"></span>
-                    MOD ANALYSIS
-                </div>
+  <footer>
+    <a href="#" class="footer-brand">fabric<span>2</span>spigot</a>
+    <p>built for the minecraft modding community.</p>
+    <span>© 2026 fabric2spigot</span>
+  </footer>
 
-                <div class="floating-label label-bottom">
-                    <span class="mini-dot"></span>
-                    TRANSLATION SYSTEM
-                </div>
-            </div>
-        </section>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="assets/js/analyzer.js"></script>
+  <script src="assets/js/app.js"></script>
 
-        <section id="converter" class="converter-section">
-            <div class="section-heading">
-                <div>
-                    <span class="section-index">01 / CONVERSION MODULE</span>
-                    <h2>Deploy your <span>mod.</span></h2>
-                    <p>Upload a Fabric JAR to begin compatibility analysis.</p>
-                </div>
+  <script>
+    const fileInput = document.getElementById("modFile");
+    const selectedFile = document.getElementById("selectedFile");
+    const dropZone = document.getElementById("dropZone");
+    const menuToggle = document.getElementById("menuToggle");
+    const navLinks = document.querySelector(".nav-links");
 
-                <div class="module-status">
-                    <span class="status-dot"></span>
-                    READY FOR INPUT
-                </div>
-            </div>
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      selectedFile.textContent = file ? "✓ " + file.name : "";
+    });
 
-            <div class="converter-panel">
-                <div class="panel-topbar">
-                    <div class="panel-circles">
-                        <span></span><span></span><span></span>
-                    </div>
-                    <span>FABRIC2SPIGOT / ANALYZER</span>
-                    <span class="panel-version">MODULE 01</span>
-                </div>
+    ["dragenter", "dragover"].forEach(type => {
+      dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.add("drag-active");
+      });
+    });
 
-                <div class="upload-area">
-                    <div class="upload-icon">
-                        <svg viewBox="0 0 24 24" fill="none">
-                            <path d="M12 16V4m0 0L7 9m5-5 5 5"
-                                stroke="currentColor" stroke-width="1.7"
-                                stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"
-                                stroke="currentColor" stroke-width="1.7"
-                                stroke-linecap="round"/>
-                        </svg>
-                    </div>
+    ["dragleave", "drop"].forEach(type => {
+      dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.remove("drag-active");
+      });
+    });
 
-                    <h3>Drop your Fabric JAR here</h3>
-                    <p>Select a modification from your device to inspect its structure.</p>
+    dropZone.addEventListener("drop", event => {
+      const file = [...event.dataTransfer.files].find(
+        item => item.name.toLowerCase().endsWith(".jar")
+      );
+      if (!file) return;
 
-                    <label for="modFile" class="file-button">
-                        Browse files
-                    </label>
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      fileInput.files = transfer.files;
+      fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    });
 
-                    <input type="file" id="modFile" accept=".jar">
+    menuToggle.addEventListener("click", () => {
+      navLinks.classList.toggle("nav-open");
+    });
 
-                    <span class="file-hint">JAVA ARCHIVE · .JAR FORMAT</span>
-                    <div id="selectedFile" class="selected-file"></div>
-                </div>
-
-                <div class="panel-footer">
-                    <div class="footer-info">
-                        <span class="status-dot"></span>
-                        LOCAL FILE ANALYSIS
-                    </div>
-
-                    <button id="analyzeButton" class="analyze-button">
-                        ANALYZE MOD <span>→</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="output-panel">
-                <div class="output-heading">
-                    <div>
-                        <span class="section-index">02 / ANALYSIS OUTPUT</span>
-                        <h3>Engine <span>console</span></h3>
-                    </div>
-                    <span class="console-live">
-                        <span class="status-dot"></span> LIVE
-                    </span>
-                </div>
-
-                <pre id="output">Waiting for a Fabric mod...
-System initialized.
-Awaiting input.</pre>
-            </div>
-        </section>
-
-        <section id="features" class="features-section">
-            <div class="section-heading">
-                <div>
-                    <span class="section-index">03 / ENGINE CAPABILITIES</span>
-                    <h2>Built for <span>compatibility.</span></h2>
-                    <p>Every conversion begins with understanding the mod.</p>
-                </div>
-            </div>
-
-            <div class="feature-grid">
-                <article class="feature-card">
-                    <span class="feature-number">01</span>
-                    <div class="feature-icon">⌕</div>
-                    <h3>Deep analysis</h3>
-                    <p>Inspect mod metadata, dependencies, entrypoints and internal structure.</p>
-                    <span class="feature-tag">INSPECTION</span>
-                </article>
-
-                <article class="feature-card">
-                    <span class="feature-number">02</span>
-                    <div class="feature-icon">⇄</div>
-                    <h3>API translation</h3>
-                    <p>Map supported Fabric functionality to compatible Bukkit and Paper APIs.</p>
-                    <span class="feature-tag">TRANSLATION</span>
-                </article>
-
-                <article class="feature-card">
-                    <span class="feature-number">03</span>
-                    <div class="feature-icon">▣</div>
-                    <h3>Plugin generation</h3>
-                    <p>Build plugin source files and configuration for supported conversions.</p>
-                    <span class="feature-tag">GENERATION</span>
-                </article>
-            </div>
-        </section>
-
-        <section id="about" class="about-section">
-            <span class="section-index">04 / ABOUT THE PROJECT</span>
-            <h2>One ecosystem.<br><span>Different platforms.</span></h2>
-            <p>
-                Fabric2Spigot is a community project exploring automated
-                conversion of Minecraft Fabric mods into Paper and Spigot
-                plugins. Not every mod can be converted automatically.
-                Unsupported features will be identified rather than
-                falsely reported as converted.
-            </p>
-        </section>
-
-    </main>
-
-    <footer>
-        <a href="#" class="footer-brand">FABRIC<span>2</span>SPIGOT</a>
-        <p>Built for the Minecraft modding community.</p>
-        <span>© 2026 FABRIC2SPIGOT</span>
-    </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="assets/js/analyzer.js"></script>
-    <script src="assets/js/app.js"></script>
-
-    <script>
-        const modFile = document.getElementById("modFile");
-        const selectedFile = document.getElementById("selectedFile");
-
-        modFile.addEventListener("change", () => {
-            const file = modFile.files[0];
-
-            selectedFile.textContent = file
-                ? "✓ " + file.name
-                : "";
-        });
-
-        const uploadArea = document.querySelector(".upload-area");
-
-        ["dragenter", "dragover"].forEach(eventName => {
-            uploadArea.addEventListener(eventName, event => {
-                event.preventDefault();
-                uploadArea.classList.add("drag-active");
-            });
-        });
-
-        ["dragleave", "drop"].forEach(eventName => {
-            uploadArea.addEventListener(eventName, event => {
-                event.preventDefault();
-                uploadArea.classList.remove("drag-active");
-            });
-        });
-
-        uploadArea.addEventListener("drop", event => {
-            const files = event.dataTransfer.files;
-
-            if (files.length && files[0].name.toLowerCase().endsWith(".jar")) {
-                const transfer = new DataTransfer();
-                transfer.items.add(files[0]);
-                modFile.files = transfer.files;
-                modFile.dispatchEvent(new Event("change", { bubbles: true }));
-            }
-        });
-    </script>
-
+    navLinks.querySelectorAll("a").forEach(link => {
+      link.addEventListener("click", () => navLinks.classList.remove("nav-open"));
+    });
+  </script>
 </body>
 </html>

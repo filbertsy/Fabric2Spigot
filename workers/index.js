@@ -5,117 +5,151 @@ import { generatePluginZip } from "./generator.js";
 
 const MAX_UPLOAD_SIZE = 25 * 1024 * 1024;
 
-const SUPPORTED_VERSIONS = {
-  "1.21.8": {
-    paperApi: "1.21.8-R0.1-SNAPSHOT",
-    java: 21,
-    apiVersion: "1.21"
-  }
+const VERSIONS = {
+    "1.21.8": {
+        minecraft: "1.21.8",
+        paper: "1.21.8-R0.1-SNAPSHOT",
+        java: 21,
+        apiVersion: "1.21"
+    }
 };
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data, null, 2), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    }
-  });
+const ALLOWED_ORIGIN = "https://fabric2spigot.pages.dev";
+
+function corsHeaders(origin) {
+    return {
+        "Access-Control-Allow-Origin":
+            origin === ALLOWED_ORIGIN ? origin : ALLOWED_ORIGIN,
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin"
+    };
 }
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  };
+function json(data, status = 200, origin = "") {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: {
+            ...corsHeaders(origin),
+            "Content-Type": "application/json"
+        }
+    });
 }
 
 export default {
-  async fetch(request) {
-    const url = new URL(request.url);
+    async fetch(request) {
+        const url = new URL(request.url);
+        const origin = request.headers.get("Origin") || "";
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders() });
-    }
-
-    if (url.pathname === "/api/health" && request.method === "GET") {
-      return json({
-        ok: true,
-        name: "Fabric2Spigot API",
-        status: "running"
-      });
-    }
-
-    if (url.pathname === "/api/versions" && request.method === "GET") {
-      return json({
-        versions: Object.keys(SUPPORTED_VERSIONS)
-      });
-    }
-
-    if (url.pathname === "/api/convert" && request.method === "POST") {
-      try {
-        const form = await request.formData();
-        const file = form.get("file");
-        const version = String(form.get("version") || "");
-
-        if (!file || typeof file.arrayBuffer !== "function") {
-          return json({ error: "Upload a JAR or ZIP file." }, 400);
+        if (request.method === "OPTIONS") {
+            return new Response(null, {
+                status: 204,
+                headers: corsHeaders(origin)
+            });
         }
 
-        if (file.size <= 0 || file.size > MAX_UPLOAD_SIZE) {
-          return json({
-            error: "File must be between 1 byte and 25 MB."
-          }, 413);
+        if (url.pathname === "/api/health" && request.method === "GET") {
+            return json({
+                ok: true,
+                name: "Fabric2Spigot API",
+                status: "running"
+            }, 200, origin);
         }
 
-        if (!/\.(jar|zip)$/i.test(file.name || "")) {
-          return json({
-            error: "Only .jar and .zip files are supported."
-          }, 400);
+        if (url.pathname === "/api/versions" && request.method === "GET") {
+            return json({
+                ok: true,
+                versions: Object.keys(VERSIONS)
+            }, 200, origin);
         }
 
-        const target = SUPPORTED_VERSIONS[version];
+        if (url.pathname === "/api/convert" && request.method === "POST") {
+            try {
+                const form = await request.formData();
+                const file = form.get("file");
+                const version = form.get("version");
 
-        if (!target) {
-          return json({
-            error: "Unsupported Minecraft version.",
-            supportedVersions: Object.keys(SUPPORTED_VERSIONS)
-          }, 400);
+                if (!file || typeof file.arrayBuffer !== "function") {
+                    return json({
+                        ok: false,
+                        error: "A Fabric JAR or ZIP file is required."
+                    }, 400, origin);
+                }
+
+                if (![".jar", ".zip"].some(ext =>
+                    file.name.toLowerCase().endsWith(ext)
+                )) {
+                    return json({
+                        ok: false,
+                        error: "Only .jar and .zip files are supported."
+                    }, 400, origin);
+                }
+
+                if (file.size > MAX_UPLOAD_SIZE) {
+                    return json({
+                        ok: false,
+                        error: "File exceeds the 25 MB upload limit."
+                    }, 413, origin);
+                }
+
+                const target = VERSIONS[version];
+
+                if (!target) {
+                    return json({
+                        ok: false,
+                        error: "Unsupported Minecraft target version."
+                    }, 400, origin);
+                }
+
+                const bytes = new Uint8Array(await file.arrayBuffer());
+
+                const analysis = await analyzeFabricMod(
+                    bytes,
+                    file.name
+                );
+
+                const translation = await translateFeatures(
+                    analysis,
+                    target
+                );
+
+                const zip = await generatePluginZip(
+                    analysis,
+                    translation,
+                    target
+                );
+
+                if (!zip) {
+                    throw new Error("The generator returned no ZIP data.");
+                }
+
+                const zipBytes = zip instanceof Uint8Array
+                    ? zip
+                    : new Uint8Array(zip);
+
+                return new Response(zipBytes, {
+                    status: 200,
+                    headers: {
+                        ...corsHeaders(origin),
+                        "Content-Type": "application/zip",
+                        "Content-Disposition":
+                            'attachment; filename="fabric2spigot-project.zip"',
+                        "Content-Length": String(zipBytes.byteLength)
+                    }
+                });
+
+            } catch (error) {
+                return json({
+                    ok: false,
+                    error: error.message || "Conversion failed."
+                }, 500, origin);
+            }
         }
 
-        const bytes = new Uint8Array(await file.arrayBuffer());
-
-        const analysis = await analyzeFabricMod(bytes, file.name);
-        const translations = translateFeatures(analysis.features, target);
-
-        const zip = await generatePluginZip({
-          metadata: analysis.metadata,
-          features: analysis.features,
-          translations,
-          target
-        });
-
-        return new Response(zip, {
-          status: 200,
-          headers: {
-            ...corsHeaders(),
-            "Content-Type": "application/zip",
-            "Content-Disposition": 'attachment; filename="fabric2spigot-project.zip"',
-            "Cache-Control": "no-store"
-          }
-        });
-      } catch (error) {
         return json({
-          error: error instanceof Error
-            ? error.message
-            : "Conversion failed."
-        }, 422);
-      }
+            ok: false,
+            error: "Endpoint not found."
+        }, 404, origin);
     }
-
-    return json({ error: "Endpoint not found." }, 404);
-  }
 };

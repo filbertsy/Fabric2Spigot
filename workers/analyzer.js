@@ -53,14 +53,14 @@ function decodeText(bytes) {
 }
 
 function findMetadata(files) {
-  const candidates = Object.keys(files).filter((path) =>
-    path === "fabric.mod.json" ||
-    path.endsWith("/fabric.mod.json")
+  const candidates = Object.keys(files).filter(
+    path => path === "fabric.mod.json" ||
+      path.endsWith("/fabric.mod.json")
   );
 
-  if (candidates.length === 0) {
+  if (!candidates.length) {
     throw new Error(
-      "fabric.mod.json was not found. Upload a Fabric mod JAR or a source ZIP containing its metadata."
+      "fabric.mod.json was not found. Upload a Fabric mod JAR."
     );
   }
 
@@ -77,7 +77,11 @@ function parseMetadata(bytes) {
     throw new Error("fabric.mod.json contains invalid JSON.");
   }
 
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+  if (
+    !metadata ||
+    typeof metadata !== "object" ||
+    Array.isArray(metadata)
+  ) {
     throw new Error("Fabric metadata must be a JSON object.");
   }
 
@@ -104,6 +108,20 @@ function parseMetadata(bytes) {
   };
 }
 
+function getEntrypointClass(value) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value && typeof value === "object") {
+    return typeof value.value === "string"
+      ? value.value
+      : null;
+  }
+
+  return null;
+}
+
 export async function analyzeFabricMod(bytes, filename) {
   if (!(bytes instanceof Uint8Array)) {
     throw new Error("Invalid upload data.");
@@ -119,8 +137,8 @@ export async function analyzeFabricMod(bytes, filename) {
 
   const paths = Object.keys(files);
 
-  if (paths.length === 0) {
-    throw new Error("The uploaded archive is empty.");
+  if (!paths.length) {
+    throw new Error("The archive is empty.");
   }
 
   if (paths.length > MAX_ENTRIES) {
@@ -139,76 +157,113 @@ export async function analyzeFabricMod(bytes, filename) {
 
   const metadataPath = findMetadata(files);
   const metadata = parseMetadata(files[metadataPath]);
+
   metadata.metadataPath = metadataPath;
 
   const evidence = [];
+  const entrypointClasses = [];
+
+  function addEvidence(category, source, marker, extra = {}) {
+    evidence.push({
+      category,
+      source,
+      marker,
+      ...extra
+    });
+  }
 
   for (const path of paths) {
-    if (
-      !path.endsWith(".class") &&
-      !path.endsWith(".java")
-    ) {
+    if (!path.endsWith(".class") && !path.endsWith(".java")) {
       continue;
     }
 
     const content = decodeText(files[path]);
+    const lowerPath = path.toLowerCase();
 
     for (const rule of RULES) {
       for (const marker of rule.markers) {
         if (content.includes(marker)) {
-          evidence.push({
-            category: rule.category,
-            source: path,
-            marker
-          });
+          addEvidence(rule.category, path, marker);
         }
       }
     }
 
-    if (content.includes("net/minecraft/client") ||
-        content.includes("net.minecraft.client")) {
-      evidence.push({
-        category: "client_rendering",
-        source: path,
-        marker: "Minecraft client reference"
-      });
+    if (
+      content.includes("net/minecraft/client") ||
+      content.includes("net.minecraft.client")
+    ) {
+      addEvidence(
+        "client_rendering",
+        path,
+        "Minecraft client reference"
+      );
     }
 
-    if (content.includes("org.spongepowered.asm.mixin") ||
-        content.includes("@Mixin")) {
-      evidence.push({
-        category: "mixins",
-        source: path,
-        marker: "Mixin reference"
-      });
+    if (
+      content.includes("org.spongepowered.asm.mixin") ||
+      content.includes("@Mixin")
+    ) {
+      addEvidence("mixins", path, "Mixin reference");
     }
 
     if (content.includes("accessWidener")) {
-      evidence.push({
-        category: "access_wideners",
-        source: path,
-        marker: "Access widener reference"
-      });
+      addEvidence(
+        "access_wideners",
+        path,
+        "Access widener reference"
+      );
+    }
+
+    if (
+      lowerPath.includes("dynamiclight") ||
+      lowerPath.includes("dynamic_light")
+    ) {
+      addEvidence(
+        "dynamic_lighting",
+        path,
+        "Dynamic-lighting class name"
+      );
     }
   }
 
-  for (const [entrypoint, value] of Object.entries(metadata.entrypoints)) {
-    evidence.push({
-      category: entrypoint === "client"
-        ? "client_entrypoint"
-        : "entrypoint",
-      source: metadataPath,
-      marker: `Entrypoint: ${entrypoint}`,
-      value
-    });
+  for (const [type, rawValue] of Object.entries(metadata.entrypoints)) {
+    const values = Array.isArray(rawValue)
+      ? rawValue
+      : [rawValue];
+
+    for (const value of values) {
+      const className = getEntrypointClass(value);
+
+      if (className) {
+        entrypointClasses.push({
+          type,
+          className
+        });
+      }
+
+      addEvidence(
+        type === "client" ? "client_entrypoint" : "entrypoint",
+        metadataPath,
+        `Entrypoint: ${type}`,
+        { value }
+      );
+    }
+  }
+
+  if (metadata.environment === "client") {
+    addEvidence(
+      "client_rendering",
+      metadataPath,
+      "Mod environment is client-only"
+    );
   }
 
   if (metadata.mixins.length > 0) {
-    evidence.push({
-      category: "mixins",
-      source: metadataPath,
-      marker: "Mixin configuration declared"
-    });
+    addEvidence(
+      "mixins",
+      metadataPath,
+      "Mixin configuration declared"
+    );
   }
 
   const unique = new Map();
@@ -221,6 +276,7 @@ export async function analyzeFabricMod(bytes, filename) {
   return {
     filename,
     metadata,
+    entrypointClasses,
     features: [...unique.values()],
     fileCount: paths.length,
     expandedSize

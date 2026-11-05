@@ -1,100 +1,167 @@
-console.log("[Fabric2Spigot] app.js loaded");
-alert("Fabric2Spigot app.js loaded");
 
-const API_URL = "https://fabric2spigot-api.freehook.workers.dev";
+(() => {
+    "use strict";
 
-const fileInput = document.getElementById("modFile");
-const analyzeButton = document.getElementById("analyzeButton");
-const output = document.getElementById("output");
+    const API_URL = "https://fabric2spigot-api.freehook.workers.dev";
+    const MAX_UPLOAD_SIZE = 25 * 1024 * 1024;
+    const TARGET_VERSION = "1.21.8";
 
-const MAX_UPLOAD_SIZE = 25 * 1024 * 1024;
+    function initialize() {
+        const fileInput = document.getElementById("modFile");
+        const analyzeButton = document.getElementById("analyzeButton");
+        const output = document.getElementById("output");
+        const selectedFile = document.getElementById("selectedFile");
+        const dropZone = document.getElementById("dropZone");
 
-function log(message) {
-    if (output) {
-        output.textContent = message;
-    }
-}
+        if (!fileInput || !analyzeButton || !output) {
+            console.error("[Fabric2Spigot] Required HTML elements missing.");
+            return;
+        }
 
-analyzeButton?.addEventListener("click", async () => {
-    const file = fileInput?.files?.[0];
+        let currentFile = null;
 
-    if (!file) {
-        log("Select a Fabric JAR or ZIP first.");
-        return;
-    }
+        function log(message) {
+            output.textContent = message;
+            console.log("[Fabric2Spigot]", message);
+        }
 
-    if (!/\.(jar|zip)$/i.test(file.name)) {
-        log("Invalid file. Only JAR and ZIP files are supported.");
-        return;
-    }
+        function selectFile(file) {
+            if (!file) return;
 
-    if (file.size > MAX_UPLOAD_SIZE) {
-        log("File exceeds the 25 MB upload limit.");
-        return;
-    }
+            if (!/\.(jar|zip)$/i.test(file.name)) {
+                currentFile = null;
+                log("Error: select a .jar or .zip file.");
+                return;
+            }
 
-    const versionSelect = document.getElementById("targetVersion");
-    const version = versionSelect?.value || "1.21.8";
+            if (file.size > MAX_UPLOAD_SIZE) {
+                currentFile = null;
+                log("Error: file exceeds the 25 MB upload limit.");
+                return;
+            }
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("version", version);
+            currentFile = file;
 
-    analyzeButton.disabled = true;
-    log("Uploading mod to Fabric2Spigot API...");
+            if (selectedFile) {
+                selectedFile.textContent = "selected: " + file.name;
+            }
 
-    try {
-        const response = await fetch(`${API_URL}/api/convert`, {
-            method: "POST",
-            body: formData
-        });
-
-        if (!response.ok) {
-            const error = await response.json().catch(() => null);
-
-            throw new Error(
-                error?.error || `API returned HTTP ${response.status}`
+            log(
+                "File selected successfully.\n" +
+                "Name: " + file.name + "\n" +
+                "Size: " + (file.size / 1024).toFixed(2) + " KB"
             );
         }
 
-        const contentType = response.headers.get("Content-Type") || "";
+        fileInput.addEventListener("change", () => {
+            selectFile(fileInput.files?.[0]);
+        });
 
-        if (!contentType.includes("application/zip")) {
-            throw new Error("Server did not return a ZIP archive.");
+        if (dropZone) {
+            dropZone.addEventListener("dragover", event => {
+                event.preventDefault();
+                dropZone.classList.add("dragging");
+            });
+
+            dropZone.addEventListener("dragleave", () => {
+                dropZone.classList.remove("dragging");
+            });
+
+            dropZone.addEventListener("drop", event => {
+                event.preventDefault();
+                dropZone.classList.remove("dragging");
+
+                selectFile(event.dataTransfer?.files?.[0]);
+            });
         }
 
-        log("Conversion complete. Preparing download...");
+        analyzeButton.addEventListener("click", async () => {
+            if (analyzeButton.disabled) return;
 
-        const blob = await response.blob();
+            if (!currentFile) {
+                log("Please select a Fabric JAR first.");
+                return;
+            }
 
-        if (!blob.size) {
-            throw new Error("Generated ZIP is empty.");
-        }
+            const formData = new FormData();
+            formData.append("file", currentFile);
+            formData.append("version", TARGET_VERSION);
 
-        const downloadUrl = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+            analyzeButton.disabled = true;
+            log("Uploading " + currentFile.name + "...");
 
-        link.href = downloadUrl;
-        link.download = "fabric2spigot-project.zip";
+            try {
+                const endpoint = API_URL + "/api/convert";
 
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+                console.log("[Fabric2Spigot] Sending POST:", endpoint);
 
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    body: formData
+                });
 
-        log(
-            `Conversion successful!\n\n` +
-            `File: ${file.name}\n` +
-            `Target: ${version}\n` +
-            `ZIP size: ${(blob.size / 1024).toFixed(2)} KB\n\n` +
-            `Your download should be available.`
-        );
+                console.log("[Fabric2Spigot] Response:", response.status);
 
-    } catch (error) {
-        log("Conversion failed: " + error.message);
-        console.error("Fabric2Spigot conversion error:", error);
-    } finally {
-        analyzeButton.disabled = false;
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+
+                    throw new Error(
+                        error.error || "Server returned HTTP " + response.status
+                    );
+                }
+
+                const contentType =
+                    response.headers.get("content-type") || "";
+
+                if (!contentType.includes("application/zip")) {
+                    throw new Error(
+                        "Expected ZIP, received: " + contentType
+                    );
+                }
+
+                const blob = await response.blob();
+
+                if (!blob.size) {
+                    throw new Error("The generated ZIP is empty.");
+                }
+
+                const downloadURL = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+
+                link.href = downloadURL;
+                link.download = "fabric2spigot-project.zip";
+
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+
+                setTimeout(() => URL.revokeObjectURL(downloadURL), 10000);
+
+                log(
+                    "CONVERSION COMPLETE\n\n" +
+                    "File: " + currentFile.name + "\n" +
+                    "Target: " + TARGET_VERSION + "\n" +
+                    "ZIP size: " + (blob.size / 1024).toFixed(2) + " KB\n\n" +
+                    "Your plugin project has been generated."
+                );
+
+            } catch (error) {
+                console.error("[Fabric2Spigot] Conversion error:", error);
+                log("CONVERSION FAILED\n\n" + error.message);
+            } finally {
+                analyzeButton.disabled = false;
+            }
+        });
+
+        log("Fabric2Spigot initialized.\nWaiting for a Fabric mod...");
+        console.log("[Fabric2Spigot] Application initialized.");
     }
-});
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initialize, {
+            once: true
+        });
+    } else {
+        initialize();
+    }
+})();

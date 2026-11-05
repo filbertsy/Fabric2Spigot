@@ -2,207 +2,480 @@
 import { zipSync, strToU8 } from "fflate";
 
 function safeName(value) {
-  return String(value)
-    .replace(/[^a-zA-Z0-9_-]/g, "")
-    .slice(0, 48) || "ConvertedMod";
+    return String(value || "ConvertedMod")
+        .replace(/[^a-zA-Z0-9_-]/g, "")
+        .slice(0, 48) || "ConvertedMod";
 }
 
-function escapeJava(value) {
-  return String(value)
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\r/g, "")
-    .replace(/\n/g, "\\n");
+function safeModId(value) {
+    let id = String(value || "converted_mod")
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "_");
+
+    if (!/^[a-z]/.test(id)) {
+        id = `mod_${id}`;
+    }
+
+    return id.slice(0, 64);
 }
 
 function escapeYaml(value) {
-  return String(value)
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "''")
-    .replace(/\r?\n/g, " ");
+    return String(value || "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "''")
+        .replace(/\r?\n/g, " ");
 }
 
-function escapeJson(value) {
-  return JSON.stringify(value, null, 2);
+function put(files, path, content) {
+    files[path] = strToU8(content);
+}
+
+function inferSide(item) {
+    if (item.side) return item.side;
+
+    const category = String(item.category || "").toLowerCase();
+
+    if (
+        category === "client_rendering" ||
+        category === "client_entrypoint"
+    ) {
+        return "client";
+    }
+
+    if (
+        category === "networking"
+    ) {
+        return "hybrid";
+    }
+
+    if (
+        category === "commands" ||
+        category === "player_events" ||
+        category === "server_events" ||
+        category === "items" ||
+        category === "blocks" ||
+        category === "entities" ||
+        category === "recipes"
+    ) {
+        return "server";
+    }
+
+    return "unknown";
 }
 
 export async function generatePluginZip({
-  metadata,
-  features,
-  translations,
-  target
+    metadata,
+    features,
+    translations,
+    target
 }) {
-  if (!metadata || !target || !Array.isArray(translations)) {
-    throw new Error("Invalid project generation data.");
-  }
-
-  const pluginName = safeName(metadata.id);
-  const packageName = `dev.fabric2spigot.generated.${pluginName.toLowerCase()}`;
-  const packagePath = packageName.replace(/\./g, "/");
-  const javaClass = `${pluginName}Plugin`;
-
-  const supported = translations.filter(
-    (item) => item.status === "experimental"
-  );
-
-  const unsupported = translations.filter(
-    (item) => item.status === "unsupported"
-  );
-
-  const javaSource = `package ${packageName};
-
-import org.bukkit.plugin.java.JavaPlugin;
-
-public final class ${javaClass} extends JavaPlugin {
-
-    @Override
-    public void onEnable() {
-        getLogger().info("Generated Paper plugin initialized.");
-        getLogger().info("Original Fabric mod: ${escapeJava(metadata.name)}");
-        getLogger().warning("This project is a scaffold. Original Fabric behavior has not been reproduced.");
-
-        ${supported.length > 0
-          ? `getLogger().info("Detected experimental feature categories: ${supported.length}");`
-          : `getLogger().info("No experimental feature categories were detected.");`}
-        ${unsupported.length > 0
-          ? `getLogger().warning("${unsupported.length} feature entries require manual implementation.");`
-          : ""}
+    if (
+        !metadata ||
+        !target ||
+        !Array.isArray(features) ||
+        !Array.isArray(translations)
+    ) {
+        throw new Error("Invalid project generation data.");
     }
 
-    @Override
-    public void onDisable() {
-        getLogger().info("Generated Paper plugin disabled.");
+    const required = [
+        "paperApi",
+        "apiVersion",
+        "minecraft",
+        "java",
+        "fabricLoader",
+        "fabricApi",
+        "loom"
+    ];
+
+    for (const key of required) {
+        if (
+            target[key] === undefined ||
+            target[key] === null ||
+            target[key] === ""
+        ) {
+            throw new Error(`Missing target configuration: ${key}`);
+        }
+    }
+
+    const projectName = safeName(metadata.id);
+    const modId = safeModId(metadata.id);
+
+    const root = projectName;
+
+    const normalized = translations.map(item => ({
+        ...item,
+        side: inferSide(item)
+    }));
+
+    const experimental = normalized.filter(
+        item => item.status === "experimental"
+    );
+
+    const manual = normalized.filter(
+        item => item.status === "manual_port_required"
+    );
+
+    const unsupported = normalized.filter(
+        item => item.status === "unsupported"
+    );
+
+    const serverFeatures = normalized.filter(
+        item => item.side === "server" || item.side === "hybrid"
+    );
+
+    const clientFeatures = normalized.filter(
+        item => item.side === "client" || item.side === "hybrid"
+    );
+
+    const packageName = "dev.fabric2spigot.generated";
+    const javaVersion = Number(target.java);
+
+    if (!Number.isInteger(javaVersion) || javaVersion < 17) {
+        throw new Error("Invalid Java target version.");
+    }
+
+    const javaName = JSON.stringify(metadata.name || metadata.id);
+    const description = escapeYaml(
+        metadata.description || `Generated from ${metadata.name || metadata.id}`
+    );
+
+    const files = {};
+
+    // Root Gradle project
+    put(files, `${root}/settings.gradle`, `
+pluginManagement {
+    repositories {
+        maven {
+            url = "https://maven.fabricmc.net/"
+        }
+        gradlePluginPortal()
+        mavenCentral()
     }
 }
-`;
 
-  const buildGradle = `plugins {
+rootProject.name = '${projectName}'
+
+include 'plugin'
+include 'client-mod'
+`);
+
+    put(files, `${root}/build.gradle`, `
+allprojects {
+    group = '${packageName}'
+    version = '1.0.0'
+
+    repositories {
+        mavenCentral()
+
+        maven {
+            url = 'https://repo.papermc.io/repository/maven-public/'
+        }
+
+        maven {
+            url = 'https://maven.fabricmc.net/'
+        }
+    }
+}
+`);
+
+    put(files, `${root}/gradle.properties`, `
+org.gradle.jvmargs=-Xmx2G
+org.gradle.parallel=true
+
+minecraft_version=${target.minecraft}
+paper_api_version=${target.paperApi}
+java_version=${javaVersion}
+
+fabric_loader_version=${target.fabricLoader}
+fabric_api_version=${target.fabricApi}
+loom_version=${target.loom}
+`);
+
+    // Paper plugin module
+    put(files, `${root}/plugin/build.gradle`, `
+plugins {
     id 'java'
 }
 
-group = '${packageName}'
-version = '1.0.0'
-
-repositories {
-    mavenCentral()
-    maven {
-        name = 'papermc'
-        url = 'https://repo.papermc.io/repository/maven-public/'
-    }
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:\${paper_api_version}"
 }
 
-dependencies {
-    compileOnly 'io.papermc.paper:paper-api:${target.paperApi}'
+sourceSets {
+    main {
+        java {
+            srcDir rootProject.file('shared/src/main/java')
+        }
+    }
 }
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(${target.java})
+        languageVersion = JavaLanguageVersion.of(\${javaVersion})
     }
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
-`;
+`);
 
-  const pluginYml = `name: ${pluginName}
+    put(files, `${root}/plugin/src/main/resources/plugin.yml`, `
+name: ${projectName}
 version: 1.0.0
-main: ${packageName}.${javaClass}
+main: ${packageName}.ConvertedPlugin
 api-version: '${target.apiVersion}'
-description: '${escapeYaml(metadata.description || `Generated from ${metadata.name}`)}'
-`;
+description: '${description}'
+`);
 
-  const diagnostics = [
-    `# Conversion diagnostics`,
-    ``,
-    `- Original mod: ${metadata.name}`,
-    `- Mod ID: ${metadata.id}`,
-    `- Mod version: ${metadata.version}`,
-    `- Target Paper API: ${target.paperApi}`,
-    `- Target Java: ${target.java}`,
-    `- Detected feature entries: ${features.length}`,
-    `- Experimental entries: ${supported.length}`,
-    `- Unsupported entries: ${unsupported.length}`,
-    ``,
-    `## Detected features`,
-    ...features.map((item) =>
-      `- ${item.category}: ${item.marker} (${item.source})`
-    ),
-    ``,
-    `## Translation assessment`,
-    ...translations.map((item) =>
-      `- [${item.status.toUpperCase()}] ${item.category}: ${item.explanation}`
-    ),
-    ``,
-    `## Important limitation`,
-    `This output is a Paper plugin scaffold, not a completed behavioral conversion.`,
-    `No original Fabric classes or resources have been transferred.`,
-    `Experimental entries identify possible API equivalents only.`,
-    `Unsupported features require manual redesign.`
-  ].join("\n");
+    put(files, `${root}/plugin/src/main/java/dev/fabric2spigot/generated/ConvertedPlugin.java`, `
+package dev.fabric2spigot.generated;
 
-  const readme = `# ${pluginName}
+import org.bukkit.plugin.java.JavaPlugin;
 
-Experimental Paper plugin project generated by Fabric2Spigot.
+public final class ConvertedPlugin extends JavaPlugin {
+
+    @Override
+    public void onEnable() {
+        getLogger().info("Hybrid Paper module initialized.");
+        getLogger().info("Original Fabric mod: " + ${javaName});
+        getLogger().info("Server feature entries: ${serverFeatures.length}");
+        getLogger().info("Client feature entries: ${clientFeatures.length}");
+        getLogger().warning("Generated scaffold: original behavior has not been ported.");
+    }
+
+    @Override
+    public void onDisable() {
+        getLogger().info("Hybrid Paper module disabled.");
+    }
+}
+`);
+
+    // Fabric client module
+    put(files, `${root}/client-mod/build.gradle`, `
+plugins {
+    id 'net.fabricmc.fabric-loom-remap' version "\${loom_version}"
+}
+
+base {
+    archivesName = '${modId}-client'
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:\${minecraft_version}"
+    mappings loom.officialMojangMappings()
+
+    modImplementation "net.fabricmc:fabric-loader:\${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:\${fabric_api_version}"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir rootProject.file('shared/src/main/java')
+        }
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(\${javaVersion})
+    }
+}
+`);
+
+    const fabricMetadata = {
+        schemaVersion: 1,
+        id: modId,
+        version: "1.0.0",
+        name: String(metadata.name || metadata.id),
+        description: String(
+            metadata.description || "Generated Fabric client module."
+        ),
+        environment: "client",
+        entrypoints: {
+            client: [
+                "dev.fabric2spigot.generated.ConvertedClient"
+            ]
+        },
+        depends: {
+            fabricloader: `>=${target.fabricLoader}`,
+            minecraft: `~${target.minecraft}`,
+            java: `>=${javaVersion}`,
+            "fabric-api": "*"
+        }
+    };
+
+    put(
+        files,
+        `${root}/client-mod/src/main/resources/fabric.mod.json`,
+        JSON.stringify(fabricMetadata, null, 2)
+    );
+
+    put(files, `${root}/client-mod/src/main/java/dev/fabric2spigot/generated/ConvertedClient.java`, `
+package dev.fabric2spigot.generated;
+
+import net.fabricmc.api.ClientModInitializer;
+
+public final class ConvertedClient implements ClientModInitializer {
+
+    @Override
+    public void onInitializeClient() {
+        System.out.println("[Fabric2Spigot] Client module initialized.");
+        System.out.println("[Fabric2Spigot] Original mod: " + ${javaName});
+        System.out.println("[Fabric2Spigot] Client features detected: ${clientFeatures.length}");
+        System.out.println("[Fabric2Spigot] Rendering implementations require manual porting.");
+    }
+}
+`);
+
+    // Shared module
+    put(files, `${root}/shared/src/main/java/dev/fabric2spigot/shared/Protocol.java`, `
+package dev.fabric2spigot.shared;
+
+public final class Protocol {
+
+    public static final String CHANNEL = "fabric2spigot:hybrid";
+
+    private Protocol() {
+    }
+}
+`);
+
+    // Diagnostics report
+    const report = {
+        originalMod: metadata,
+        target,
+        architecture: "hybrid",
+        modules: [
+            "plugin",
+            "client-mod",
+            "shared"
+        ],
+        summary: {
+            detectedFeatures: features.length,
+            serverFeatures: serverFeatures.length,
+            clientFeatures: clientFeatures.length,
+            experimental: experimental.length,
+            manualPortRequired: manual.length,
+            unsupported: unsupported.length
+        },
+        detectedFeatures: features,
+        translations: normalized,
+        behaviorAutomaticallyPorted: false
+    };
+
+    put(
+        files,
+        `${root}/conversion-report.json`,
+        JSON.stringify(report, null, 2)
+    );
+
+    const diagnostics = [
+        "# Hybrid conversion diagnostics",
+        "",
+        `- Original mod: ${metadata.name || metadata.id}`,
+        `- Mod ID: ${metadata.id}`,
+        `- Mod version: ${metadata.version || "unknown"}`,
+        `- Minecraft: ${target.minecraft}`,
+        `- Paper API: ${target.paperApi}`,
+        `- Java: ${javaVersion}`,
+        "- Architecture: Hybrid",
+        `- Detected features: ${features.length}`,
+        `- Server feature entries: ${serverFeatures.length}`,
+        `- Client feature entries: ${clientFeatures.length}`,
+        `- Experimental entries: ${experimental.length}`,
+        `- Manual port required: ${manual.length}`,
+        `- Unsupported entries: ${unsupported.length}`,
+        "",
+        "## Detected features",
+        ...features.map(item =>
+            `- ${item.category}: ${item.marker} (${item.source})`
+        ),
+        "",
+        "## Translation assessment",
+        ...normalized.map(item =>
+            `- [${String(item.status).toUpperCase()}] [${item.side}] ${item.category}: ${item.explanation}`
+        ),
+        "",
+        "## Limitations",
+        "- This project is a hybrid scaffold, not a completed behavioral conversion.",
+        "- Original Fabric classes and resources are not transferred.",
+        "- Client rendering requires individual implementation.",
+        "- Paper and Fabric modules must be implemented separately.",
+        "- Mixins require individual review.",
+        "- The shared protocol currently defines a channel identifier only."
+    ].join("\n");
+
+    put(files, `${root}/diagnostics.md`, diagnostics);
+
+    // Project documentation
+    const readme = `
+# ${projectName}
+
+Hybrid Paper + Fabric project generated by Fabric2Spigot.
+
+## Modules
+
+- plugin/: Paper server plugin.
+- client-mod/: Fabric client mod.
+- shared/: shared Java source.
+- diagnostics.md: conversion diagnostics.
+- conversion-report.json: machine-readable report.
 
 ## Requirements
 
-- Java ${target.java}
-- Gradle 8.10 or newer
-- Paper server compatible with ${target.paperApi}
+- Java ${javaVersion}
+- Gradle 8.14 or compatible
+- Minecraft ${target.minecraft}
+- Paper API ${target.paperApi}
 
 ## Build
 
-Run:
+Run from this directory:
 
 \`\`\`bash
 gradle build
 \`\`\`
 
-The plugin JAR will be located in:
+Paper plugin output:
 
-\`build/libs/\`
+\`plugin/build/libs/\`
 
-## Conversion status
+Fabric client mod output:
 
-This is an experimental scaffold. It does not reproduce the original Fabric mod's behavior.
+\`client-mod/build/libs/\`
 
-Review \`diagnostics.md\` before using this project.
+## Installation
+
+1. Install the plugin JAR on the Paper server.
+2. Install the Fabric client JAR on each compatible client.
+3. Use matching Minecraft and Fabric Loader versions.
+
+## Important
+
+This is a project scaffold. It does not automatically reproduce the
+original Fabric mod's behavior.
+
+Review diagnostics.md before using the generated project.
 `;
 
-  const files = {
-    [`${pluginName}/settings.gradle`]:
-      strToU8(`rootProject.name = '${pluginName}'\n`),
+    put(files, `${root}/README.md`, readme);
 
-    [`${pluginName}/build.gradle`]:
-      strToU8(buildGradle),
+    put(files, `${root}/.gitignore`, `
+.gradle/
+build/
+*/build/
+.idea/
+.vscode/
+*.iml
+`);
 
-    [`${pluginName}/src/main/resources/plugin.yml`]:
-      strToU8(pluginYml),
-
-    [`${pluginName}/src/main/java/${packagePath}/${javaClass}.java`]:
-      strToU8(javaSource),
-
-    [`${pluginName}/README.md`]:
-      strToU8(readme),
-
-    [`${pluginName}/diagnostics.md`]:
-      strToU8(diagnostics),
-
-    [`${pluginName}/conversion-report.json`]:
-      strToU8(escapeJson({
-        originalMod: metadata,
-        target,
-        detectedFeatures: features,
-        translations,
-        behaviorAutomaticallyPorted: false
-      }))
-  };
-
-  try {
-    return zipSync(files, { level: 6 });
-  } catch {
-    throw new Error("Could not package the generated plugin project.");
-  }
+    try {
+        return zipSync(files, { level: 6 });
+    } catch (error) {
+        console.error("Fabric2Spigot ZIP generation error:", error);
+        throw new Error("Could not package the generated hybrid project.");
+    }
 }

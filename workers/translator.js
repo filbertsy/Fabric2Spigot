@@ -1,124 +1,137 @@
-
 const TRANSLATION_RULES = {
   commands: {
-    status: "experimental",
+    status: "manual",
     side: "server",
     paperApi: "org.bukkit.command",
     explanation:
-      "Command functionality may be recreated using Paper command registration."
+      "Only explicitly recognized command implementations can be automatically converted."
   },
 
   player_events: {
     status: "experimental",
     side: "server",
     paperApi: "org.bukkit.event.player",
-    explanation:
-      "Some player events have Bukkit equivalents. Individual event behavior must be mapped."
+    explanation: "Individual player events require behavior-specific mapping."
   },
 
   server_events: {
     status: "experimental",
     side: "server",
     paperApi: "org.bukkit.event.server",
-    explanation:
-      "Some server lifecycle events can be recreated with Bukkit listeners."
+    explanation: "Individual server events require behavior-specific mapping."
   },
 
   items: {
     status: "experimental",
     side: "server",
     paperApi: "org.bukkit.inventory",
-    explanation:
-      "Basic custom item behavior may be recreated using Bukkit item stacks and metadata."
+    explanation: "Custom item behavior requires individual mapping."
   },
 
   blocks: {
     status: "experimental",
     side: "server",
     paperApi: "org.bukkit.block",
-    explanation:
-      "Some block interactions can be recreated using Bukkit events."
+    explanation: "Custom block behavior requires individual mapping."
   },
 
   entities: {
     status: "experimental",
     side: "server",
     paperApi: "org.bukkit.entity",
-    explanation:
-      "Some entity interactions can be recreated using Bukkit entity APIs."
+    explanation: "Entity behavior requires individual mapping."
   },
 
   recipes: {
     status: "experimental",
     side: "server",
     paperApi: "org.bukkit.inventory",
-    explanation:
-      "Supported recipes may be recreated using Bukkit recipe classes."
+    explanation: "Recipe behavior requires individual mapping."
   },
 
   networking: {
     status: "unsupported",
     side: "hybrid",
     paperApi: null,
-    explanation:
-      "Fabric networking requires protocol-specific rewriting."
+    explanation: "Fabric networking requires protocol-specific rewriting."
   },
 
   dynamic_lighting: {
     status: "unsupported",
     side: "client",
     paperApi: null,
-    explanation:
-      "Dynamic lighting is a client-side rendering feature and cannot directly run as a Paper plugin."
+    explanation: "Dynamic lighting is a client-side rendering feature."
   },
 
   client_rendering: {
     status: "unsupported",
     side: "client",
     paperApi: null,
-    explanation:
-      "Client rendering features cannot run as ordinary Paper server plugins."
+    explanation: "Client rendering cannot run as an ordinary Paper plugin."
   },
 
   client_entrypoint: {
     status: "unsupported",
     side: "client",
     paperApi: null,
-    explanation:
-      "Client entrypoints do not have a direct Paper server equivalent."
+    explanation: "Client entrypoints have no direct Paper equivalent."
   },
 
   mixins: {
     status: "unsupported",
     side: "unknown",
     paperApi: null,
-    explanation:
-      "Mixin transformations require manual redesign."
+    explanation: "Mixin transformations require manual redesign."
   },
 
   access_wideners: {
     status: "unsupported",
     side: "unknown",
     paperApi: null,
-    explanation:
-      "Access wideners modify Minecraft internals and cannot be directly transferred."
+    explanation: "Access wideners modify Minecraft internals."
   },
 
   entrypoint: {
     status: "manual",
     side: "unknown",
     paperApi: null,
-    explanation:
-      "The entrypoint class must be inspected to identify its initialization behavior before conversion."
+    explanation: "Entrypoint initialization must be inspected individually."
   }
 };
+
+const BROADCAST_SOURCE =
+  "net/mcreator/simplebroadcast/init/SimpleBroadcastModCommands.class";
+
+function identifyCommandConversion(feature) {
+  const source = String(feature.source || "").replace(/\\/g, "/");
+
+  if (
+    source.endsWith(BROADCAST_SOURCE) &&
+    feature.marker === "CommandRegistrationCallback"
+  ) {
+    return {
+      id: "simple_broadcast_v1",
+      description: "Simple Broadcast command conversion"
+    };
+  }
+
+  return null;
+}
 
 export function translateFeatures(features, target) {
   if (!Array.isArray(features)) {
     throw new Error("Feature analysis is invalid.");
   }
 
+  if (!target || !Number.isInteger(Number(target.java))) {
+    throw new Error("Target Java configuration is invalid.");
+  }
+
   return features.map(feature => {
+    if (!feature || typeof feature.category !== "string") {
+      throw new Error("Invalid feature entry.");
+    }
+
     const rule = TRANSLATION_RULES[feature.category];
 
     if (!rule) {
@@ -134,7 +147,7 @@ export function translateFeatures(features, target) {
       };
     }
 
-    return {
+    const result = {
       category: feature.category,
       source: feature.source,
       marker: feature.marker,
@@ -144,5 +157,18 @@ export function translateFeatures(features, target) {
       explanation: rule.explanation,
       targetJava: target.java
     };
+
+    if (feature.category === "commands") {
+      const conversion = identifyCommandConversion(feature);
+
+      if (conversion) {
+        result.status = "supported";
+        result.conversion = conversion.id;
+        result.explanation =
+          "Recognized Simple Broadcast command. Generates /broadcast with its original single-word argument behavior.";
+      }
+    }
+
+    return result;
   });
 }

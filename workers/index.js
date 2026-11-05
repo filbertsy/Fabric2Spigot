@@ -10,7 +10,11 @@ const VERSIONS = {
         minecraft: "1.21.8",
         paperApi: "1.21.8-R0.1-SNAPSHOT",
         java: 21,
-        apiVersion: "1.21"
+        apiVersion: "1.21",
+
+        fabricLoader: "0.17.2",
+        fabricApi: "0.134.0+1.21.8",
+        loom: "1.11.8"
     }
 };
 
